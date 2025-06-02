@@ -7,9 +7,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "migrate": "node src/scripts/migrate.js",
+    "migrate:status": "node src/scripts/migrate.js status",
+    "migrate:rollback": "node src/scripts/migrate.js rollback",
     "init-db": "node src/scripts/init-db.js",
     "setup-mod": "node src/scripts/setup-moderator.js",
-    "migrate": "sqlite3 agora.db < src/database/migration.sql"
+    "setup": "npm run migrate && npm run init-db && npm run setup-mod"
   },
   "dependencies": {
     "express": "^4.18.2",
