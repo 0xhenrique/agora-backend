@@ -1,0 +1,162 @@
+* Agora Backend
+
+Political forum backend built with Node.js, Express, and SQLite.
+
+** Features
+
+- User registration and authentication with JWT tokens
+- Post creation with optional URLs and images
+- Threaded commenting system (4chan-style flat structure)
+- Voting system for posts and comments
+- Automatic post cleanup after 48 hours
+- Rate limiting and security middleware
+- RESTful API design
+
+** Tech Stack
+
+- Node.js with ES modules
+- Express.js web framework
+- SQLite database with foreign key constraints
+- bcrypt for password hashing
+- JWT for authentication
+- node-cron for scheduled cleanup jobs
+
+** Installation
+
+#+begin_src bash
+# Clone and install dependencies
+npm install
+
+# Copy environment file
+cp .env.example .env
+
+# Initialize database with test data
+npm run init-db
+
+# Start development server
+npm run dev
+#+end_src
+
+** API Endpoints
+
+*** Authentication
+- POST /api/auth/register - Register new user
+- POST /api/auth/login - Login user
+- GET /api/auth/verify - Verify JWT token
+
+*** Posts
+- GET /api/posts - Get all posts (paginated)
+- GET /api/posts/:id - Get single post with comments
+- POST /api/posts - Create new post (requires auth)
+
+*** Comments
+- POST /api/comments - Create comment (requires auth)
+- GET /api/comments/post/:postId - Get comments for post
+
+*** Votes
+- POST /api/votes - Cast or update vote (requires auth)
+- POST /api/votes/status - Get vote status for multiple items
+
+** Database Schema
+
+*** Users
+- id (PRIMARY KEY)
+- username (UNIQUE, NOT NULL)
+- password_hash (NOT NULL)
+- created_at (DATETIME)
+
+*** Posts
+- id (PRIMARY KEY)
+- title (NOT NULL)
+- url (optional)
+- image_url (optional)
+- body (optional)
+- author_id (FOREIGN KEY)
+- votes (INTEGER, default 0)
+- created_at (DATETIME)
+
+*** Comments
+- id (PRIMARY KEY)
+- post_id (FOREIGN KEY)
+- author_id (FOREIGN KEY)
+- body (NOT NULL)
+- reply_to_id (FOREIGN KEY, optional)
+- votes (INTEGER, default 0)
+- created_at (DATETIME)
+
+*** Votes
+- id (PRIMARY KEY)
+- user_id (FOREIGN KEY)
+- item_id (references post or comment)
+- item_type ('post' or 'comment')
+- vote_type ('up' or 'down')
+- created_at (DATETIME)
+- UNIQUE constraint on (user_id, item_id, item_type)
+
+** Security Features
+
+- Password hashing with bcrypt (12 rounds)
+- JWT token authentication
+- Rate limiting (100 req/15min general, 5 req/15min auth)
+- CORS protection
+- Helmet.js security headers
+- SQL injection prevention with parameterized queries
+- Input validation and sanitization
+
+** Automatic Cleanup
+
+Posts older than 48 hours are automatically deleted every hour. The cleanup job runs:
+- Immediately on server startup
+- Every hour via cron schedule
+- Cascading deletes remove associated comments and votes
+
+** Development
+
+#+begin_src bash
+# Run with auto-restart
+npm run dev
+
+# Initialize/reset database
+npm run init-db
+
+# Start production server
+npm start
+#+end_src
+
+** Frontend Integration
+
+The backend expects the frontend to:
+- Send JWT tokens in Authorization header: "Bearer <token>"
+- Handle CORS requests from configured frontend URL
+- Parse JSON responses for all API endpoints
+
+** Environment Variables
+
+See .env.example for configuration options. Key variables:
+- JWT_SECRET: Secret key for signing tokens (change in production!)
+- FRONTEND_URL: Frontend URL for CORS configuration
+- PORT: Server port (default 3001)
+- NODE_ENV: Environment (development/production)
+
+** Project Structure
+#+begin_src bash
+backend/
+├── src/
+│   ├── database/
+│   │   ├── db.js (SQLite connection & helper methods)
+│   │   └── schema.sql (Database schema)
+│   ├── middleware/
+│   │   └── auth.js (JWT authentication middleware)
+│   ├── routes/
+│   │   ├── auth.js (register/login endpoints)
+│   │   ├── posts.js (post CRUD operations)
+│   │   ├── comments.js (comment creation)
+│   │   └── votes.js (voting system)
+│   ├── jobs/
+│   │   └── cleanup.js (48-hour post deletion)
+│   ├── scripts/
+│   │   └── init-db.js (database initialization)
+│   └── server.js (main application)
+├── package.json
+└── .env.example
+#+end_src
