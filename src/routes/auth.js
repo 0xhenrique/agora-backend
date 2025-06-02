@@ -45,7 +45,8 @@ router.post('/register', async (req, res) => {
       message: 'User created successfully',
       user: {
         id: result.id,
-        username
+        username,
+        role: 'user'
       },
       token
     });
@@ -65,8 +66,11 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    // Find user
-    const user = await db.get('SELECT id, username, password_hash FROM users WHERE username = ?', [username]);
+    // Find user with role info
+    const user = await db.get(
+      'SELECT id, username, password_hash, role FROM users WHERE username = ?', 
+      [username]
+    );
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -84,7 +88,8 @@ router.post('/login', async (req, res) => {
       message: 'Login successful',
       user: {
         id: user.id,
-        username: user.username
+        username: user.username,
+        role: user.role
       },
       token
     });
@@ -95,7 +100,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Verify token (for frontend to check if user is still logged in)
+// Verify token (updated to include role)
 router.get('/verify', async (req, res) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -109,7 +114,10 @@ router.get('/verify', async (req, res) => {
     const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
     
     const decoded = jwt.default.verify(token, JWT_SECRET);
-    const user = await db.get('SELECT id, username FROM users WHERE id = ?', [decoded.userId]);
+    const user = await db.get(
+      'SELECT id, username, role FROM users WHERE id = ?', 
+      [decoded.userId]
+    );
     
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
@@ -118,7 +126,8 @@ router.get('/verify', async (req, res) => {
     res.json({
       user: {
         id: user.id,
-        username: user.username
+        username: user.username,
+        role: user.role
       }
     });
 

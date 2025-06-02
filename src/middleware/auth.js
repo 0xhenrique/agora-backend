@@ -1,3 +1,4 @@
+// src/middleware/auth.js (updated)
 import jwt from 'jsonwebtoken';
 import db from '../database/db.js';
 
@@ -14,8 +15,8 @@ export const authenticateToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // Verify user still exists
-    const user = await db.get('SELECT id, username FROM users WHERE id = ?', [decoded.userId]);
+    // Verify user still exists and get role info
+    const user = await db.get('SELECT id, username, role, is_banned FROM users WHERE id = ?', [decoded.userId]);
     if (!user) {
       return res.status(401).json({ error: 'Invalid token - user not found' });
     }
@@ -39,7 +40,7 @@ export const optionalAuth = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await db.get('SELECT id, username FROM users WHERE id = ?', [decoded.userId]);
+    const user = await db.get('SELECT id, username, role, is_banned FROM users WHERE id = ?', [decoded.userId]);
     req.user = user || null;
   } catch (error) {
     req.user = null;

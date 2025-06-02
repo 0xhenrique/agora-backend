@@ -1,6 +1,7 @@
 import express from 'express';
 import db from '../database/db.js';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
+import { checkBanStatus } from '../middleware/moderation.js';
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
 
-    // Get posts with author usernames and comment counts
+    // Get posts with author usernames, comment counts, and author ban status
     const posts = await db.all(`
       SELECT 
         p.id,
@@ -22,6 +23,7 @@ router.get('/', optionalAuth, async (req, res) => {
         p.votes,
         p.created_at as createdAt,
         u.username as author,
+        u.is_banned as authorBanned,
         COUNT(c.id) as commentCount
       FROM posts p
       JOIN users u ON p.author_id = u.id
@@ -46,9 +48,10 @@ router.get('/', optionalAuth, async (req, res) => {
       }, {});
     }
 
-    // Add user vote info to posts
+    // Add user vote info to posts and convert authorBanned to boolean
     const postsWithVotes = posts.map(post => ({
       ...post,
+      authorBanned: Boolean(post.authorBanned),
       userVote: userVotes[post.id] || null
     }));
 
@@ -82,7 +85,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
         p.body,
         p.votes,
         p.created_at as createdAt,
-        u.username as author
+        u.username as author,
+        u.is_banned as authorBanned
       FROM posts p
       JOIN users u ON p.author_id = u.id
       WHERE p.id = ?
@@ -100,7 +104,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
         c.reply_to_id as replyToId,
         c.votes,
         c.created_at as createdAt,
-        u.username as author
+        u.username as author,
+        u.is_banned as authorBanned
       FROM comments c
       JOIN users u ON c.author_id = u.id
       WHERE c.post_id = ?
@@ -124,10 +129,13 @@ router.get('/:id', optionalAuth, async (req, res) => {
       }, {});
     }
 
-    // Add user vote info
+    // Add user vote info and convert authorBanned to boolean
+    post.authorBanned = Boolean(post.authorBanned);
     post.userVote = userVotes[`post_${post.id}`] || null;
+    
     const commentsWithVotes = comments.map(comment => ({
       ...comment,
+      authorBanned: Boolean(comment.authorBanned),
       userVote: userVotes[`comment_${comment.id}`] || null
     }));
 
@@ -142,8 +150,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
   }
 });
 
-// Create new post
-router.post('/', authenticateToken, async (req, res) => {
+// Create new post (now includes ban check)
+router.post('/', authenticateToken, checkBanStatus, async (req, res) => {
   try {
     const { title, url, imageUrl, body } = req.body;
 
@@ -191,7 +199,8 @@ router.post('/', authenticateToken, async (req, res) => {
         p.body,
         p.votes,
         p.created_at as createdAt,
-        u.username as author
+        u.username as author,
+        u.is_banned as authorBanned
       FROM posts p
       JOIN users u ON p.author_id = u.id
       WHERE p.id = ?
@@ -201,6 +210,7 @@ router.post('/', authenticateToken, async (req, res) => {
       message: 'Post created successfully',
       post: {
         ...newPost,
+        authorBanned: Boolean(newPost.authorBanned),
         commentCount: 0,
         userVote: null
       }

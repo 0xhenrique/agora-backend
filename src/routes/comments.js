@@ -1,11 +1,12 @@
 import express from 'express';
 import db from '../database/db.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { checkBanStatus } from '../middleware/moderation.js';
 
 const router = express.Router();
 
-// Create new comment
-router.post('/', authenticateToken, async (req, res) => {
+// Create new comment (now includes ban check)
+router.post('/', authenticateToken, checkBanStatus, async (req, res) => {
   try {
     const { postId, body, replyToId } = req.body;
 
@@ -54,7 +55,8 @@ router.post('/', authenticateToken, async (req, res) => {
         c.reply_to_id as replyToId,
         c.votes,
         c.created_at as createdAt,
-        u.username as author
+        u.username as author,
+        u.is_banned as authorBanned
       FROM comments c
       JOIN users u ON c.author_id = u.id
       WHERE c.id = ?
@@ -64,6 +66,7 @@ router.post('/', authenticateToken, async (req, res) => {
       message: 'Comment created successfully',
       comment: {
         ...newComment,
+        authorBanned: Boolean(newComment.authorBanned),
         userVote: null
       }
     });
@@ -85,7 +88,7 @@ router.get('/post/:postId', async (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
 
-    // Get comments
+    // Get comments with author ban status
     const comments = await db.all(`
       SELECT 
         c.id,
@@ -93,14 +96,21 @@ router.get('/post/:postId', async (req, res) => {
         c.reply_to_id as replyToId,
         c.votes,
         c.created_at as createdAt,
-        u.username as author
+        u.username as author,
+        u.is_banned as authorBanned
       FROM comments c
       JOIN users u ON c.author_id = u.id
       WHERE c.post_id = ?
       ORDER BY c.created_at ASC
     `, [postId]);
 
-    res.json({ comments });
+    // Convert authorBanned to boolean
+    const commentsWithBooleanBan = comments.map(comment => ({
+      ...comment,
+      authorBanned: Boolean(comment.authorBanned)
+    }));
+
+    res.json({ comments: commentsWithBooleanBan });
 
   } catch (error) {
     console.error('Get comments error:', error);

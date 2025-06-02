@@ -10,6 +10,8 @@ import authRoutes from './routes/auth.js';
 import postsRoutes from './routes/posts.js';
 import commentsRoutes from './routes/comments.js';
 import votesRoutes from './routes/votes.js';
+import reportsRoutes from './routes/reports.js';
+import moderationRoutes from './routes/moderation.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -17,9 +19,14 @@ const PORT = process.env.PORT || 3001;
 // Security middleware
 app.use(helmet());
 
+const allowedOrigins = [
+	"http://localhost:5173",
+	"https://agora-mauve-three.vercel.app/"
+];
+
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: allowedOrigins,
   credentials: true
 }));
 
@@ -36,6 +43,13 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // limit each IP to 5 requests per windowMs
   message: 'Too many authentication attempts'
+});
+
+// Moderate rate limiting for moderation endpoints
+const modLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // limit each IP to 50 moderation requests per windowMs
+  message: 'Too many moderation requests'
 });
 
 // Body parsing middleware
@@ -56,6 +70,8 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/comments', commentsRoutes);
 app.use('/api/votes', votesRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/mod', modLimiter, moderationRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
